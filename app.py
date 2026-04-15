@@ -81,14 +81,24 @@ with col2:
         location=[df['lat'].mean(), df['lon'].mean()], 
         zoom_start=14
     )
-
+def get_marker_color(bikes_available):
+    if bikes_available == 0:
+        return "red"
+    elif bikes_available < 5:
+        return "orange"
+    else:
+        return "green"
+        
     # Add red markers ONLY for unselected stations
-    for n in range(len(df)):
+   for n in range(len(df)):
         if str(df['station_id'][n]) != str(selected_station):
+            # Calculate color based on bikes
+            marker_color = get_marker_color(df['num_bikes_available'][n])
+            
             folium.Marker(
                 location=[df['lat'][n], df['lon'][n]],
-                tooltip=f"{df['station_id'][n]} - {df['name'][n]}",
-                icon=folium.Icon(color="red"),
+                tooltip=f"{df['station_id'][n]} - {df['name'][n]} (Bikes: {df['num_bikes_available'][n]})",
+                icon=folium.Icon(color=marker_color, icon="bicycle", prefix='fa'),
             ).add_to(m)
 
     # Add the special cloud marker for the SELECTED station

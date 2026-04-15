@@ -20,7 +20,7 @@ df = pd.DataFrame(data)
 # ROW 1: Title and Caption
 # ==========================================
 st.title("🚲 EcoBici Station Explorer")
-st.caption("Created by: [Your Name Here]")
+st.caption("Created by: Luthfia Yuwono")
 
 st.divider() # A nice visual line to separate the rows
 

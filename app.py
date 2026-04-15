@@ -42,33 +42,35 @@ with col1:
 
 # RIGHT COLUMN: The Map
 with col2:
-    # 1. Initialize the map
+   # 1. Initialize the map
     m = folium.Map(
         location=[df['lat'].mean(), df['lon'].mean()], 
         zoom_start=14
     )
 
-    # 2. Add red markers for ALL stations
+    # 2. Add red markers ONLY for unselected stations
     for n in range(len(df)):
-        folium.Marker(
-            location=[df['lat'][n], df['lon'][n]],
-            tooltip=str(df['station_id'][n]),
-            icon=folium.Icon(color="red"),
-        ).add_to(m)
+        if str(df['station_id'][n]) != str(selected_station):
+            folium.Marker(
+                location=[df['lat'][n], df['lon'][n]],
+                tooltip=str(df['station_id'][n]),
+                icon=folium.Icon(color="red"),
+            ).add_to(m)
 
     # 3. Add the special cloud marker for the SELECTED station
-    # We filter the dataframe based on the dropdown selection
     temp = df[df['station_id'] == str(selected_station)]
     
     if not temp.empty:
-        # We use .iloc[0] to safely grab the exact float values for the map
         folium.Marker(
             location=[temp.iloc[0]['lat'], temp.iloc[0]['lon']],
             tooltip=f"Selected: {temp.iloc[0]['station_id']}",
-            icon=folium.Icon(icon="cloud", color="blue"), # Made it blue so it stands out against the red!
+            icon=folium.Icon(icon="cloud", color="blue"), 
         ).add_to(m)
     else:
         st.error('Station not found')
+
+    # 4. Render the map
+    st_folium(m, width=800, height=500)
 
     # 4. Render the Folium map in Streamlit
     st_folium(m, width=800, height=500)

@@ -6,14 +6,17 @@ from streamlit_folium import st_folium
 # --- Setup Page Config ---
 st.set_page_config(page_title="EcoBici Map", layout="wide")
 
-# --- Dummy Data (Replace this with your actual DataFrame loading code) ---
-# I'm adding this so the script runs perfectly out-of-the-box.
-data = {
-    'station_id': ['101', '102', '103', '104'],
-    'lat': [19.4326, 19.4284, 19.4350, 19.4200],
-    'lon': [-99.1332, -99.1415, -99.1400, -99.1500]
-}
-df = pd.DataFrame(data)
+url='https://gbfs.mex.lyftbikes.com/gbfs/gbfs.json'
+website_data=requests.get(url).json()
+urls=website_data['data']['en']['feeds
+url_data = [u['url'] for u in urls if 'station' in u['url']]
+data1=requests.get(url_data[0]).json()
+df1=pd.DataFrame(data1['data']['stations'])
+data2=requests.get(url_data[1]).json()
+df2=pd.DataFrame(data2['data']['stations'])
+df1=df1[['station_id','lat','lon','capacity']]
+df2=df2[['station_id','num_bikes_available','num_bikes_disabled','num_docks_available','num_docks_disabled']]
+df=pd.merge(df1,df2,on='station_id')
 
 
 # ==========================================

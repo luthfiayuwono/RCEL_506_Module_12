@@ -67,11 +67,15 @@ with col1:
         id_to_name = dict(zip(map_df['station_id'], map_df['name']))
         station_list = map_df['station_id'].tolist()
         
-        # NEW: Safety check. If the currently selected station gets filtered out by the slider, reset it.
-        if "station_selector" in st.session_state and st.session_state["station_selector"] not in station_list:
-            del st.session_state["station_selector"]
+        # Initialize session state for the dropdown if it doesn't exist
+        if "station_selector" not in st.session_state:
+            st.session_state["station_selector"] = station_list[0]
+            
+        # Safety check: If the currently selected station is filtered out by the slider, reset it
+        if st.session_state["station_selector"] not in station_list:
+            st.session_state["station_selector"] = station_list[0]
         
-        # NEW: We added key="station_selector" to save this to Streamlit's session state
+        # The selectbox is tied directly to the session state key "station_selector"
         selected_station = st.selectbox(
             "Select a Station:", 
             options=station_list,
@@ -82,6 +86,7 @@ with col1:
         st.divider()
         st.subheader("📊 Station Status")
         
+        # Grab the data for the currently selected station
         station_data = map_df[map_df['station_id'] == str(selected_station)].iloc[0]
         
         metric_col1, metric_col2 = st.columns(2)
@@ -107,7 +112,7 @@ with col1:
     else:
         st.warning("No stations match your filter. Please lower the slider.")
         selected_station = None
-        station_list = [] # Failsafe for map logic
+        station_list = [] 
 
 # RIGHT COLUMN: The Map
 with col2:
@@ -128,6 +133,7 @@ with col2:
 
     if not map_df.empty:
         for n in range(len(map_df)):
+            # Draw standard markers for unselected stations
             if str(map_df.loc[n, 'station_id']) != str(selected_station):
                 
                 amount_here = map_df.loc[n, target_column]
@@ -136,11 +142,11 @@ with col2:
                 
                 folium.Marker(
                     location=[map_df.loc[n, 'lat'], map_df.loc[n, 'lon']],
-                    # We format the tooltip specifically so we can extract the ID later
                     tooltip=f"{map_df.loc[n, 'station_id']} - {map_df.loc[n, 'name']} ({amount_here} available)",
                     icon=folium.Icon(color=marker_color, icon=map_icon, prefix='fa'),
                 ).add_to(marker_cluster)
 
+        # Draw the special highlighted cloud marker for the selected station
         if selected_station:
             temp = map_df[map_df['station_id'] == str(selected_station)]
             if not temp.empty:
@@ -150,28 +156,29 @@ with col2:
                     icon=folium.Icon(icon="cloud", color="blue"), 
                 ).add_to(m)
 
-    # NEW: We save the map output to a variable called 'st_data'
+    # Render the map and capture user click data
     st_data = st_folium(m, width=800, height=500)
 
-    # NEW: MAP CLICK INTERACTIVITY
-    # Check if the user clicked a marker and if that marker has a tooltip
+    # ==========================================
+    # MAP CLICK LOGIC
+    # ==========================================
+    # If the user clicks a marker on the map, this block extracts the station ID
     if st_data and st_data.get("last_object_clicked_tooltip"):
         clicked_tooltip = st_data["last_object_clicked_tooltip"]
         
-        # If they click an unselected station, the tooltip looks like: "21 - RIO GUADALQUIVIR (10 available)"
+        # Ensure we aren't just clicking the already-selected marker
         if not clicked_tooltip.startswith("Selected:"):
-            # Split the string by " - " to grab just the ID number on the left
+            # The tooltip looks like "21 - RIO GUADALQUIVIR (10 available)". Split by " - " to get "21".
             clicked_id_str = clicked_tooltip.split(" - ")[0]
             
-            # Find the exact matching ID in our list
+            # Find the actual ID in our station list that matches the clicked string
             matching_id = None
             for s_id in station_list:
                 if str(s_id) == clicked_id_str:
                     matching_id = s_id
                     break
             
-            # If the clicked station is different from the currently selected one, 
-            # update the session state and forcefully rerun the app!
-            if matching_id is not None and matching_id != st.session_state.get("station_selector"):
+            # If a valid new station was clicked, update session state and instantly refresh!
+            if matching_id is not None and matching_id != st.session_state["station_selector"]:
                 st.session_state["station_selector"] = matching_id
                 st.rerun()

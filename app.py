@@ -40,7 +40,14 @@ st.divider()
 # ==========================================
 # ROW 2: Layout
 # ==========================================
+
 col1, col2 = st.columns([1, 3])
+
+with st.sidebar:
+    st.header("🌎 City-Wide Network")
+    st.metric("Total Active Stations", len(df))
+    st.metric("Total Bikes Available", df['num_bikes_available'].sum())
+    st.metric("Total Empty Stations", len(df[df['num_bikes_available'] == 0]))
 
 # LEFT COLUMN: Controls & Metrics
 with col1:

@@ -3,6 +3,7 @@ import pandas as pd
 import folium
 import requests
 from streamlit_folium import st_folium
+from folium.plugins import MarkerCluster  # <--- NEW: Import MarkerCluster
 
 # --- Setup Page Config ---
 st.set_page_config(page_title="EcoBici Map", layout="wide")
@@ -40,28 +41,31 @@ st.divider()
 # ==========================================
 # ROW 2: Layout
 # ==========================================
-
 col1, col2 = st.columns([1, 3])
-
-with st.sidebar:
-    st.header("🌎 City-Wide Network")
-    st.metric("Total Active Stations", len(df))
-    st.metric("Total Bikes Available", df['num_bikes_available'].sum())
-    st.metric("Total Empty Stations", len(df[df['num_bikes_available'] == 0]))
 
 # LEFT COLUMN: Controls & Metrics
 with col1:
-    st.subheader("🎚️ Filter Map")
-    max_bikes = int(df['num_bikes_available'].max())
-    min_bikes = st.slider("Minimum bikes needed:", min_value=0, max_value=max_bikes, value=0)
+    # 1. NEW: Bike vs Dock Toggle
+    user_mode = st.radio("What are you looking for?", ["🚲 Find a Bike", "🅿️ Find an Empty Dock"])
     
-    # Filter the dataframe and reset the index so our map loop doesn't break
-    map_df = df[df['num_bikes_available'] >= min_bikes].reset_index(drop=True)
+    # Dynamically change the column we care about based on user mode
+    if user_mode == "🚲 Find a Bike":
+        target_column = 'num_bikes_available'
+        slider_label = "Minimum bikes needed:"
+    else:
+        target_column = 'num_docks_available'
+        slider_label = "Minimum empty docks needed:"
+
+    st.subheader("🎚️ Filter Map")
+    max_amount = int(df[target_column].max())
+    min_amount = st.slider(slider_label, min_value=0, max_value=max_amount, value=0)
+    
+    # Filter the dataframe dynamically based on what the user needs
+    map_df = df[df[target_column] >= min_amount].reset_index(drop=True)
     
     st.divider()
     st.subheader("🔍 Search")
     
-    # Only show dropdown and metrics if stations match the filter
     if not map_df.empty:
         id_to_name = dict(zip(map_df['station_id'], map_df['name']))
         station_list = map_df['station_id'].tolist()
@@ -94,8 +98,13 @@ with col1:
             st.write(f"**Station Capacity: {int(fill_percentage * 100)}% Full**")
             st.progress(float(fill_percentage))
             
+        # 2. NEW: Get Directions Link
+        st.divider()
+        google_maps_url = f"https://www.google.com/maps/dir/?api=1&destination={station_data['lat']},{station_data['lon']}"
+        st.markdown(f"### [**🗺️ Get Directions to Station**]({google_maps_url})")
+            
     else:
-        st.warning("No stations have that many bikes available. Please lower the slider.")
+        st.warning("No stations match your filter. Please lower the slider.")
         selected_station = None
 
 # RIGHT COLUMN: The Map
@@ -104,12 +113,14 @@ with col2:
         location=[df['lat'].mean(), df['lon'].mean()], 
         zoom_start=14
     )
+    
+    # 3. NEW: Initialize the Marker Cluster
+    marker_cluster = MarkerCluster().add_to(m)
 
-    # Helper function for marker colors
-    def get_marker_color(bikes):
-        if bikes == 0:
+    def get_marker_color(amount):
+        if amount == 0:
             return "red"
-        elif bikes < 5:
+        elif amount < 5:
             return "orange"
         else:
             return "green"
@@ -119,17 +130,21 @@ with col2:
         for n in range(len(map_df)):
             if str(map_df.loc[n, 'station_id']) != str(selected_station):
                 
-                # Color-Coded Markers
-                bikes_here = map_df.loc[n, 'num_bikes_available']
-                marker_color = get_marker_color(bikes_here)
+                # Check the amount based on what the user is looking for (bikes vs docks)
+                amount_here = map_df.loc[n, target_column]
+                marker_color = get_marker_color(amount_here)
                 
+                # Change the icon dynamically
+                map_icon = "bicycle" if user_mode == "🚲 Find a Bike" else "product-hunt"
+                
+                # ADD TO CLUSTER instead of adding directly to 'm'
                 folium.Marker(
                     location=[map_df.loc[n, 'lat'], map_df.loc[n, 'lon']],
-                    tooltip=f"{map_df.loc[n, 'station_id']} - {map_df.loc[n, 'name']} (Bikes: {bikes_here})",
-                    icon=folium.Icon(color=marker_color, icon="bicycle", prefix='fa'),
-                ).add_to(m)
+                    tooltip=f"{map_df.loc[n, 'station_id']} - {map_df.loc[n, 'name']} ({amount_here} available)",
+                    icon=folium.Icon(color=marker_color, icon=map_icon, prefix='fa'),
+                ).add_to(marker_cluster)
 
-        # Add the special cloud marker for the SELECTED station
+        # Add the selected cloud marker directly to the map 'm' so it is always clearly visible
         if selected_station:
             temp = map_df[map_df['station_id'] == str(selected_station)]
             if not temp.empty:

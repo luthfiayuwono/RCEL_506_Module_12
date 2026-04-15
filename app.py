@@ -11,16 +11,29 @@ st.set_page_config(page_title="EcoBici Map", layout="wide")
 url = 'https://gbfs.mex.lyftbikes.com/gbfs/gbfs.json'
 website_data = requests.get(url).json()
 urls = website_data['data']['en']['feeds']
-url_data = [u['url'] for u in urls if 'station' in u['url']]
 
-data1 = requests.get(url_data[0]).json()
+# 1. Safely extract exact URLs based on the feed 'name' so they never get swapped
+info_url = next(u['url'] for u in urls if u['name'] == 'station_information')
+status_url = next(u['url'] for u in urls if u['name'] == 'station_status')
+
+# 2. Load Station Information (Locations, Names)
+data1 = requests.get(info_url).json()
 df1 = pd.DataFrame(data1['data']['stations'])
 
-data2 = requests.get(url_data[1]).json()
+# 3. Load Station Status (Available Bikes/Docks)
+data2 = requests.get(status_url).json()
 df2 = pd.DataFrame(data2['data']['stations'])
 
-df1 = df1[['station_id', 'lat', 'lon', 'capacity']]
+# 4. Safely select columns (Checking if 'capacity' exists first!)
+info_columns = ['station_id', 'lat', 'lon']
+if 'capacity' in df1.columns:
+    info_columns.append('capacity')
+df1 = df1[info_columns]
+
+# 5. Select Status columns
 df2 = df2[['station_id', 'num_bikes_available', 'num_bikes_disabled', 'num_docks_available', 'num_docks_disabled']]
+
+# 6. Merge the two DataFrames
 df = pd.merge(df1, df2, on='station_id')
 
 # ==========================================

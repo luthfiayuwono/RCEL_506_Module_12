@@ -35,6 +35,30 @@ df = pd.merge(df1, df2, on='station_id')
 st.title("🚲 EcoBici Station Explorer")
 st.caption("Created by: Luthfia Yuwono")
 
+st.divider()
+
+# ==========================================
+# ROW 2: Layout
+# ==========================================
+col1, col2 = st.columns([1, 3])
+
+# LEFT COLUMN: Controls & Metrics
+with col1:
+    # 1. NEW: Minimum Bikes Slider
+    st.subheader("🎚️ Filter Map")
+    max_bikes = int(df['num_bikes_available'].max())
+    min_bikes = st.slider("Minimum bikes needed:", min_value=0, max_value=max_bikes, value=0)
+    
+    # Filter the dataframe and reset the index so our map loop doesn't break
+    map_df = df[df['num_bikes_available'] >= min_bikes].reset_index(drop=True)
+    
+    st.divider()
+    st.subheader("🔍 Search")
+    
+    # Only show dropdown and metrics if stations match the filter
+    if not map_df.empty:
+        id_to_name = dict(zip(map_df['station_id'], map_df['name']))
+        station_list = map_df['station_id'].tolist
 st.divider() 
 
 # ==========================================

@@ -70,4 +70,66 @@ with col1:
         
         station_data = map_df[map_df['station_id'] == str(selected_station)].iloc[0]
         
-        metric_col1,
+        metric_col1, metric_col2 = st.columns(2)
+        
+        with metric_col1:
+            st.metric(label="🚲 Bikes Available", value=station_data['num_bikes_available'])
+            st.metric(label="🛠️ Disabled Bikes", value=station_data['num_bikes_disabled'])
+            
+        with metric_col2:
+            st.metric(label="🅿️ Docks Available", value=station_data['num_docks_available'])
+            st.metric(label="🚧 Disabled Docks", value=station_data['num_docks_disabled'])
+            
+        # Progress Bar
+        total_slots = station_data['num_bikes_available'] + station_data['num_docks_available']
+        if total_slots > 0:
+            fill_percentage = station_data['num_bikes_available'] / total_slots
+            st.write(f"**Station Capacity: {int(fill_percentage * 100)}% Full**")
+            st.progress(float(fill_percentage))
+            
+    else:
+        st.warning("No stations have that many bikes available. Please lower the slider.")
+        selected_station = None
+
+# RIGHT COLUMN: The Map
+with col2:
+    m = folium.Map(
+        location=[df['lat'].mean(), df['lon'].mean()], 
+        zoom_start=14
+    )
+
+    # Helper function for marker colors
+    def get_marker_color(bikes):
+        if bikes == 0:
+            return "red"
+        elif bikes < 5:
+            return "orange"
+        else:
+            return "green"
+
+    if not map_df.empty:
+        # Loop through the FILTERED dataframe
+        for n in range(len(map_df)):
+            if str(map_df.loc[n, 'station_id']) != str(selected_station):
+                
+                # Color-Coded Markers
+                bikes_here = map_df.loc[n, 'num_bikes_available']
+                marker_color = get_marker_color(bikes_here)
+                
+                folium.Marker(
+                    location=[map_df.loc[n, 'lat'], map_df.loc[n, 'lon']],
+                    tooltip=f"{map_df.loc[n, 'station_id']} - {map_df.loc[n, 'name']} (Bikes: {bikes_here})",
+                    icon=folium.Icon(color=marker_color, icon="bicycle", prefix='fa'),
+                ).add_to(m)
+
+        # Add the special cloud marker for the SELECTED station
+        if selected_station:
+            temp = map_df[map_df['station_id'] == str(selected_station)]
+            if not temp.empty:
+                folium.Marker(
+                    location=[temp.iloc[0]['lat'], temp.iloc[0]['lon']],
+                    tooltip=f"Selected: {temp.iloc[0]['station_id']} - {temp.iloc[0]['name']}",
+                    icon=folium.Icon(icon="cloud", color="blue"), 
+                ).add_to(m)
+
+    st_folium(m, width=800, height=500)

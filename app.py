@@ -97,4 +97,81 @@ with col1:
         total_slots = station_data['num_bikes_available'] + station_data['num_docks_available']
         if total_slots > 0:
             fill_percentage = station_data['num_bikes_available'] / total_slots
-            st.write(f"**Station Capacity: {int(fill_percentage * 100
+            st.write(f"**Station Capacity: {int(fill_percentage * 100)}% Full**")
+            st.progress(float(fill_percentage))
+            
+        st.divider()
+        google_maps_url = f"https://www.google.com/maps/dir/?api=1&destination={station_data['lat']},{station_data['lon']}"
+        st.markdown(f"### [**🗺️ Get Directions to Station**]({google_maps_url})")
+            
+    else:
+        st.warning("No stations match your filter. Please lower the slider.")
+        selected_station = None
+        station_list = [] # Failsafe for map logic
+
+# RIGHT COLUMN: The Map
+with col2:
+    m = folium.Map(
+        location=[df['lat'].mean(), df['lon'].mean()], 
+        zoom_start=14
+    )
+    
+    marker_cluster = MarkerCluster().add_to(m)
+
+    def get_marker_color(amount):
+        if amount == 0:
+            return "red"
+        elif amount < 5:
+            return "orange"
+        else:
+            return "green"
+
+    if not map_df.empty:
+        for n in range(len(map_df)):
+            if str(map_df.loc[n, 'station_id']) != str(selected_station):
+                
+                amount_here = map_df.loc[n, target_column]
+                marker_color = get_marker_color(amount_here)
+                map_icon = "bicycle" if user_mode == "🚲 Find a Bike" else "product-hunt"
+                
+                folium.Marker(
+                    location=[map_df.loc[n, 'lat'], map_df.loc[n, 'lon']],
+                    # We format the tooltip specifically so we can extract the ID later
+                    tooltip=f"{map_df.loc[n, 'station_id']} - {map_df.loc[n, 'name']} ({amount_here} available)",
+                    icon=folium.Icon(color=marker_color, icon=map_icon, prefix='fa'),
+                ).add_to(marker_cluster)
+
+        if selected_station:
+            temp = map_df[map_df['station_id'] == str(selected_station)]
+            if not temp.empty:
+                folium.Marker(
+                    location=[temp.iloc[0]['lat'], temp.iloc[0]['lon']],
+                    tooltip=f"Selected: {temp.iloc[0]['station_id']} - {temp.iloc[0]['name']}",
+                    icon=folium.Icon(icon="cloud", color="blue"), 
+                ).add_to(m)
+
+    # NEW: We save the map output to a variable called 'st_data'
+    st_data = st_folium(m, width=800, height=500)
+
+    # NEW: MAP CLICK INTERACTIVITY
+    # Check if the user clicked a marker and if that marker has a tooltip
+    if st_data and st_data.get("last_object_clicked_tooltip"):
+        clicked_tooltip = st_data["last_object_clicked_tooltip"]
+        
+        # If they click an unselected station, the tooltip looks like: "21 - RIO GUADALQUIVIR (10 available)"
+        if not clicked_tooltip.startswith("Selected:"):
+            # Split the string by " - " to grab just the ID number on the left
+            clicked_id_str = clicked_tooltip.split(" - ")[0]
+            
+            # Find the exact matching ID in our list
+            matching_id = None
+            for s_id in station_list:
+                if str(s_id) == clicked_id_str:
+                    matching_id = s_id
+                    break
+            
+            # If the clicked station is different from the currently selected one, 
+            # update the session state and forcefully rerun the app!
+            if matching_id is not None and matching_id != st.session_state.get("station_selector"):
+                st.session_state["station_selector"] = matching_id
+                st.rerun()

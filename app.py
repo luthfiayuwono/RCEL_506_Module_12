@@ -90,7 +90,7 @@ def get_marker_color(bikes_available):
         return "green"
         
     # Add red markers ONLY for unselected stations
-   for n in range(len(df)):
+       for n in range(len(df)):
         if str(df['station_id'][n]) != str(selected_station):
             # Calculate color based on bikes
             marker_color = get_marker_color(df['num_bikes_available'][n])
